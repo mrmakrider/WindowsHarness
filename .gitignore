@@ -52,8 +52,10 @@ logs/
 *.sqlite
 
 # PyInstaller
-*.spec
 build/
+dist/
+*.spec
+!windows-harness.spec
 
 # WindowsHarness specific
 data/

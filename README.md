@@ -133,12 +133,46 @@ mypy windows-harness/
 ruff format windows-harness/
 ```
 
-## Packaging
+## Building Standalone Executable
+
+### Quick Build (Windows)
+
+```cmd
+# Run the build script (installs deps, builds .exe)
+build.bat
+```
+
+Output: `dist/WindowsHarness.exe` (~100-150 MB)
+
+### Manual Build
+
+```cmd
+# 1. Install dependencies
+pip install -r requirements.txt
+pip install PyQt6-WebEngine PyQt6-Qscintilla pyinstaller
+
+# 2. Convert icon (requires ImageMagick)
+magick assets/icon.svg assets/icon.ico
+
+# 3. Build with PyInstaller
+pyinstaller windows-harness.spec --clean
+```
+
+### GitHub Actions (Automated)
+
+Push a version tag to trigger automated build:
 
 ```bash
-# Create standalone executable
-pyinstaller --onefile --windowed main.py
+git tag v0.1.0
+git push origin v0.1.0
 ```
+
+The workflow will:
+1. Build on Windows runner
+2. Create `WindowsHarness-v0.1.0-windows-x64.zip`
+3. Attach to GitHub Release
+
+Download from: https://github.com/mrmakrider/WindowsHarness/releases
 
 ## License
 

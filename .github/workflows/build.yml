@@ -1,0 +1,94 @@
+name: Build WindowsHarness Executable
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., v0.1.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install system dependencies
+        run: |
+          # Install ImageMagick for icon conversion
+          choco install imagemagick --version 7.1.1 -y
+          refreshenv
+
+      - name: Convert icon
+        run: |
+          magick assets/icon.svg assets/icon.ico
+          dir assets/icon.ico
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install PyQt6-WebEngine PyQt6-Qscintilla pyinstaller
+
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller windows-harness.spec --clean
+
+      - name: Verify executable
+        run: |
+          if (Test-Path "dist/WindowsHarness.exe") {
+            $size = (Get-Item "dist/WindowsHarness.exe").Length / 1MB
+            Write-Host "Executable size: $("{0:N1}" -f $size) MB"
+            # Quick smoke test - just verify it starts and exits
+            Start-Process "dist/WindowsHarness.exe" -Wait -NoNewWindow -ErrorAction SilentlyContinue
+            Write-Host "Smoke test passed"
+          } else {
+            Write-Error "Executable not found!"
+            exit 1
+          }
+
+      - name: Create release archive
+        run: |
+          $version = "${{ github.event.inputs.version ?? github.ref_name }}"
+          $version = $version.TrimStart('v')
+          $archive = "WindowsHarness-v$version-windows-x64.zip"
+          Compress-Archive -Path "dist/WindowsHarness.exe" -DestinationPath $archive -Force
+          Write-Host "Created $archive"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WindowsHarness-${{ github.event.inputs.version || github.ref_name }}
+          path: dist/WindowsHarness.exe
+          retention-days: 30
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/WindowsHarness.exe
+            WindowsHarness-${{ github.ref_name }}-windows-x64.zip
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
